@@ -94,6 +94,9 @@
                 return;
             }
 
+            document.getElementById("processingMessage").style.display = "block";
+            document.getElementById("submitButton").disabled = true;
+
             fetch(csvUrl)
                 .then(response => {
                     if (!response.ok) {
