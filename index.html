@@ -35,14 +35,24 @@
                 <label for="phaseId">Phase ID</label>
             </div>
             <div class="form-floating mb-3">
+                <input type="text" class="form-control" id="authToken" name="authToken" placeholder="Auth Token"
+                    required>
+                <label for="authToken">Auth Token</label>
+            </div>
+            <div class="form-floating mb-3">
                 <input type="text" class="form-control" id="sheetsId" name="sheetsId" placeholder="Sheets ID or URL"
                     required>
                 <label for="sheetsId">Sheets ID or URL</label>
             </div>
             <div class="form-floating mb-3">
-                <input type="text" class="form-control" id="authToken" name="authToken" placeholder="Auth Token"
-                    required>
-                <label for="authToken">Auth Token</label>
+                <input class="form-control" type="text" name="seedIdHeader" id="seedIdHeader" value="seedId"
+                    placeholder="Seed ID Column" />
+                <label for="seedIdHeader">Seed ID Column</label>
+            </div>
+            <div class="form-floating mb-3">
+                <input class="form-control" type="text" name="phaseSeedHeader" id="phaseSeedHeader" value="phaseseed"
+                    placeholder="Phase Seed Column" />
+                <label for="phaseSeedHeader">Phase Seed Column</label>
             </div>
             <button type="submit" class="btn btn-primary" id="submitButton">Submit</button>
             <span id="processingMessage" style="display: none;">Processing...</span>
@@ -51,7 +61,7 @@
     </div>
     <footer style="text-align: center; margin-top: 30px;">
         ©︎ 2023 とさかず (@smash_tskz)
-      </footer>
+    </footer>
     <script>
         function showSuccessMessage() {
             document.getElementById("processingMessage").style.display = "none";
@@ -85,10 +95,12 @@
 
         document.getElementById("userInputForm").addEventListener("submit", function (event) {
             event.preventDefault();
-            var phaseId = document.getElementById("phaseId").value;
-            var sheetsId = document.getElementById("sheetsId").value;
-            var authToken = document.getElementById("authToken").value;
-            var csvUrl = getCsvUrl(sheetsId);
+            let phaseId = document.getElementById("phaseId").value;
+            let sheetsId = document.getElementById("sheetsId").value;
+            let authToken = document.getElementById("authToken").value;
+            let seedId = document.getElementById("seedIdHeader").value;
+            let phaseSeed = document.getElementById("phaseSeedHeader").value;
+            let csvUrl = getCsvUrl(sheetsId);
             if (!csvUrl) {
                 showErrorMessage("Invalid Sheets ID or URL.");
                 return;
@@ -105,23 +117,31 @@
                     return response.text();
                 })
                 .then(csvText => {
-
-                    var csvData = Papa.parse(csvText, {
+                    let csvData = Papa.parse(csvText, {
                         header: true, // Parse the header row
                         skipEmptyLines: true, // Skip empty lines
                     }).data;
-                    updatePhaseSeeding(phaseId, authToken, csvData);
+                    updatePhaseSeeding(phaseId, authToken, csvData, seedId, phaseSeed);
                 })
                 .catch(error => {
                     showErrorMessage(error.message);
                 });
         });
 
-        function updatePhaseSeeding(phaseId, authToken, csvData) {
+        function updatePhaseSeeding(phaseId, authToken, csvData, key_seedid, key_phaseseed) {
+            console.log(csvData)
             const seedMapping = csvData.map(row => ({
-                seedId: row['Seed ID'],
-                seedNum: row['Phase Seed'],
+                seedId: row[key_seedid],
+                seedNum: row[key_phaseseed],
             }));
+            if (seedMapping[0].seedId === undefined) {
+                showErrorMessage(`Invalid CSV file. Column "${key_seedid}" not found.`);
+                return;
+            }
+            if (seedMapping[0].seedNum === undefined) {
+                showErrorMessage(`Invalid CSV file. Column "${key_phaseseed}" not found.`);
+                return;
+            }
 
             const graphqlUrl = 'https://api.start.gg/gql/alpha';
             const query = `
