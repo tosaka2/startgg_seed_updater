@@ -70,13 +70,26 @@
             messageElement.classList.remove("text-success");
         }
 
+        function getCsvUrl(urlOrId) {
+            var idPattern = /[-\w]{25,}/;
+            var match = urlOrId.match(idPattern);
+            if (match) {
+                return 'https://docs.google.com/spreadsheets/d/' + match[0] + '/export?format=csv';
+            }
+            return null;
+        }
+
 
         document.getElementById("userInputForm").addEventListener("submit", function (event) {
             event.preventDefault();
             var phaseId = document.getElementById("phaseId").value;
             var sheetsId = document.getElementById("sheetsId").value;
             var authToken = document.getElementById("authToken").value;
-            var csvUrl = document.getElementById("csvUrl").value;
+            var csvUrl = getCsvUrl(sheetsId);
+            if (!csvUrl) {
+                showErrorMessage("Invalid Sheets ID or URL.");
+                return;
+            }
 
             fetch(csvUrl)
                 .then(response => {
@@ -86,18 +99,19 @@
                     return response.text();
                 })
                 .then(csvText => {
+
                     var csvData = Papa.parse(csvText, {
                         header: true, // Parse the header row
                         skipEmptyLines: true, // Skip empty lines
                     }).data;
-                    updatePhaseSeeding(phaseId, sheetsId, authToken, csvData);
+                    updatePhaseSeeding(phaseId, authToken, csvData);
                 })
                 .catch(error => {
                     showErrorMessage(error.message);
                 });
         });
 
-        function updatePhaseSeeding(phaseId, sheetsId, authToken, csvData) {
+        function updatePhaseSeeding(phaseId, authToken, csvData) {
             const seedMapping = csvData.map(row => ({
                 seedId: row['Seed ID'],
                 seedNum: row['Phase Seed'],
