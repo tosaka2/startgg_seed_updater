@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+        }
+
+        .container {
+            max-width: 500px;
+            margin: 100px auto;
+            text-align: center;
+        }
+
+        input:focus::placeholder {
+            color: transparent;
+        }
+    </style>
+    <title>Update Phase Seeding</title>
+</head>
+
+<body>
+    <div class="container">
+        <h1 class="mb-4">Update Phase Seeding</h1>
+        <form id="userInputForm">
+            <div class="form-floating mb-3">
+                <input type="number" class="form-control" id="phaseId" name="phaseId" placeholder="Phase ID" required>
+                <label for="phaseId">Phase ID</label>
+            </div>
+            <div class="form-floating mb-3">
+                <input type="text" class="form-control" id="sheetsId" name="sheetsId" placeholder="Sheets ID or URL"
+                    required>
+                <label for="sheetsId">Sheets ID or URL</label>
+            </div>
+            <div class="form-floating mb-3">
+                <input type="text" class="form-control" id="authToken" name="authToken" placeholder="Auth Token"
+                    required>
+                <label for="authToken">Auth Token</label>
+            </div>
+            <button type="submit" class="btn btn-primary" id="submitButton">Submit</button>
+            <span id="processingMessage" style="display: none;">Processing...</span>
+        </form>
+        <div id="message" class="mt-3" style="display: none;"></div>
+    </div>
+    <script>
+        function showSuccessMessage() {
+            document.getElementById("processingMessage").style.display = "none";
+            document.getElementById("submitButton").disabled = false;
+            var messageElement = document.getElementById("message");
+            messageElement.innerHTML = "Success! Seeding has been updated.";
+            messageElement.style.display = "block";
+            messageElement.classList.add("text-success");
+            messageElement.classList.remove("text-danger");
+        }
+
+        function showErrorMessage(error) {
+            document.getElementById("processingMessage").style.display = "none";
+            document.getElementById("submitButton").disabled = false;
+            var messageElement = document.getElementById("message");
+            messageElement.innerHTML = "Error: " + error;
+            messageElement.style.display = "block";
+            messageElement.classList.add("text-danger");
+            messageElement.classList.remove("text-success");
+        }
+
+
+        document.getElementById("userInputForm").addEventListener("submit", function (event) {
+            event.preventDefault();
+            var phaseId = document.getElementById("phaseId").value;
+            var sheetsId = document.getElementById("sheetsId").value;
+            var authToken = document.getElementById("authToken").value;
+            var csvUrl = document.getElementById("csvUrl").value;
+
+            fetch(csvUrl)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error("Failed to fetch CSV file.");
+                    }
+                    return response.text();
+                })
+                .then(csvText => {
+                    var csvData = Papa.parse(csvText, {
+                        header: true, // Parse the header row
+                        skipEmptyLines: true, // Skip empty lines
+                    }).data;
+                    updatePhaseSeeding(phaseId, sheetsId, authToken, csvData);
+                })
+                .catch(error => {
+                    showErrorMessage(error.message);
+                });
+        });
+
+        function updatePhaseSeeding(phaseId, sheetsId, authToken, csvData) {
+            const seedMapping = csvData.map(row => ({
+                seedId: row['Seed ID'],
+                seedNum: row['Phase Seed'],
+            }));
+
+            const graphqlUrl = 'https://api.start.gg/gql/alpha';
+            const query = `
+    mutation UpdatePhaseSeeding($phaseId: ID!, $seedMapping: [UpdatePhaseSeedInfo]!) {
+      updatePhaseSeeding(phaseId: $phaseId, seedMapping: $seedMapping) {
+        id
+      }
+    }
+  `;
+
+            fetch(graphqlUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`,
+                },
+                body: JSON.stringify({
+                    query: query,
+                    variables: {
+                        phaseId: phaseId,
+                        seedMapping: seedMapping,
+                    },
+                }),
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch data from the GraphQL API.');
+                    }
+                    return response.json();
+                })
+                .then(responseJson => {
+                    if (responseJson.errors) {
+                        showErrorMessage(responseJson.errors[0].message);
+                    } else {
+                        showSuccessMessage();
+                    }
+                })
+                .catch(error => {
+                    showErrorMessage(error.message);
+                });
+        }
+    </script>
+</body>
+<script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"
+    integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo"
+    crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/popper.js@1.14.7/dist/umd/popper.min.js"
+    integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1"
+    crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/js/bootstrap.min.js"
+    integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM"
+    crossorigin="anonymous"></script>
+</body>
+
+</html>
